@@ -69,6 +69,16 @@ GitHub → Settings → Developer settings → **Fine-grained personal access to
 3. If the run made new GCD dates, they are committed to `cache/` automatically (an option you can turn off).
    If the pipeline added rows to `aliases.csv`, you get a *Save to repo* link.
 
+**Reading parts:** under the result, *Split into reading parts* cuts the order into numbered Excel lists like
+your own (column A, one comic per row), for example `01 1961-1963 Birth of the Fantastic Four to Birth of the
+Avengers.xlsx`. You choose:
+* **Reading order:** the main order, the order with the alternate universes, or scenes (page ranges and
+  flashbacks as their own rows).
+* **Where to cut:** at the same story points as your numbered reading lists, which also gives each part its
+  list's name; or automatically, at a big event about every N comics.
+
+It runs `split_reading_order.py` from the data repo, so the repo needs pipeline v7 or later.
+
 **When do I need gcd.db?** Only when the list of comics changed, meaning new or updated pages. The app warns you
 when the saved dates are older than the comic list. On Windows Chrome/Edge it remembers the file between
 sessions. On Android, pick it each time. To make it smaller first, run `python3 gcd_slim.py /path/to/gcd.db`

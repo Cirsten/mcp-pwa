@@ -39,9 +39,7 @@ function rmTree(FS, dir) {
   }
 }
 
-async function run({ files, gcd, options }) {
-  logLines = [];
-  await init();
+function writeWork(files) {
   const FS = py.FS;
   rmTree(FS, "/work");
   FS.mkdirTree("/work");
@@ -51,6 +49,31 @@ async function run({ files, gcd, options }) {
     if (dir !== "/work/") FS.mkdirTree(dir);
     FS.writeFile("/work/" + path, new Uint8Array(buf));
   }
+}
+
+async function split({ files, results, options }) {
+  logLines = [];
+  await init();
+  writeWork(files);
+  py.FS.writeFile("/tmp/last_results.zip", new Uint8Array(results));
+  post("status", { text: "Cutting the reading order into parts…" });
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "");
+  const zipName = `reading_parts_${options.source}_${options.mode}_${stamp}.zip`;
+  const result = JSON.parse(py.globals.get("pwa_runner").split(JSON.stringify({ ...options, zipName })));
+  let zip = null;
+  if (result.code === 0 && py.FS.analyzePath("/tmp/" + zipName).exists) {
+    zip = py.FS.readFile("/tmp/" + zipName).buffer;
+    py.FS.unlink("/tmp/" + zipName);
+  }
+  py.FS.unlink("/tmp/last_results.zip");
+  self.postMessage({ type: "splitDone", result, zip, zipName }, zip ? [zip] : []);
+}
+
+async function run({ files, gcd, options }) {
+  logLines = [];
+  await init();
+  const FS = py.FS;
+  writeWork(files);
   let db = null;
   if (gcd) {
     // WORKERFS reads the file lazily, slice by slice: the 6 GB GCD file is never loaded into memory.
@@ -85,6 +108,7 @@ self.onmessage = async (e) => {
   try {
     if (msg.type === "init") { await init(); post("ready"); }
     else if (msg.type === "run") await run(msg);
+    else if (msg.type === "split") await split(msg);
   } catch (err) {
     post("error", { message: String(err && err.message ? err.message : err) });
   }

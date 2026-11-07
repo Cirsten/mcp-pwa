@@ -157,3 +157,25 @@ def make_zip(log_text, zip_name):
     with open("/tmp/" + zip_name, "wb") as f:
         f.write(data)
     return json.dumps({"files": names, "size": len(data)})
+
+
+def split(opts_json):
+    """Cut the last run's reading order into numbered parts (split_reading_order.py) -> zip in /tmp."""
+    opts = json.loads(opts_json)
+    if not os.path.exists(os.path.join(WORK, "split_reading_order.py")):
+        print("split_reading_order.py is not in the repository - add it (pipeline v7) and check GitHub again.")
+        return json.dumps({"code": 2})
+    with zipfile.ZipFile("/tmp/last_results.zip") as z:  # the last run's CSVs, on top of the repo files
+        for name in z.namelist():
+            if name.lower().endswith(".csv") and "/" not in name:
+                z.extract(name, WORK)
+    out = "/tmp/" + opts["zipName"]
+    argv = ["split_reading_order.py", "--source", opts.get("source", "main"), "--mode", opts.get("mode", "lists"),
+            "--size", str(int(opts.get("size") or 300)), "--out", out]
+    print("$ python3 " + " ".join(argv[:-2]))
+    code = _run_script(argv, WORK).returncode
+    names = []
+    if code == 0 and os.path.exists(out):
+        with zipfile.ZipFile(out) as z:
+            names = [n for n in z.namelist() if n.endswith(".xlsx")]
+    return json.dumps({"code": code, "parts": names})

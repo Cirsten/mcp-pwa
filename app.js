@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -337,6 +337,7 @@ async function afterRun(m, secs, hadGcd) {
   const r = m.result;
   const zipBlob = new Blob([m.zip], { type: "application/zip" });
   await idb.put("kv", { name: m.zipName, blob: zipBlob, when: Date.now(), info: m.zipInfo, result: r }, "lastZip");
+  await idb.del("kv", "lastParts"); // parts belong to the previous order
   // keep this run's dates on the device
   const blobOf = (b) => (b ? new Blob([b]) : null);
   if (m.cache["dates.csv"]) await idb.put("kv", { dates: blobOf(m.cache["dates.csv"]), state: blobOf(m.cache[".pipeline_state.json"]) }, "localCache");
@@ -386,16 +387,78 @@ async function renderResult() {
     (files.length ? `<br><span class="muted small">${esc(files.join(", "))}</span>` : "");
   const file = new File([z.blob], z.name, { type: "application/zip" });
   show("#btnShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
+  const ok = !z.result || z.result.code === 0;
+  show("#partsCard", ok && files.includes("reading_order.csv"));
+  const uni = $("#partSource option[value=universes]");
+  uni.disabled = !files.includes("reading_order_with_universes.csv");
+  uni.textContent = "With alternate universes" + (uni.disabled ? " (not in the last run)" : "");
+  if (uni.disabled && $("#partSource").value === "universes") $("#partSource").value = "main";
+  $("#partSource option[value=scenes]").disabled = !files.includes("segment_flashback_order.csv");
+  await renderParts();
 }
-async function downloadZip() {
-  const z = await idb.get("kv", "lastZip"); if (!z) return;
+
+/* ------------------------------------------------------------------ reading parts */
+async function renderParts() {
+  const p = await idb.get("kv", "lastParts");
+  show("#partsResult", Boolean(p));
+  if (!p) return;
+  $("#partsStatus").innerHTML = `<b>${esc(p.name)}</b> · ${p.parts.length} parts · ${fmtSize(p.blob.size)} · made ${esc(new Date(p.when).toLocaleString())}`;
+  const ul = $("#partsList"); ul.innerHTML = "";
+  for (const n of p.parts) { const li = document.createElement("li"); li.textContent = n.replace(/\.xlsx$/, ""); ul.appendChild(li); }
+  const file = new File([p.blob], p.name, { type: "application/zip" });
+  show("#btnPartsShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
+}
+
+async function makeParts() {
+  if (running) return;
+  running = true;
+  const btn = $("#btnParts"); btn.disabled = true; $("#btnRun").disabled = true;
+  const st = $("#partsStatus"); const lines = [];
+  st.textContent = "Preparing…"; show("#partsResult", false);
+  try {
+    const z = await idb.get("kv", "lastZip");
+    if (!z) throw new Error("Run the pipeline first.");
+    const stored = await localFiles();
+    const files = {}, transfer = [];
+    for (const f of stored) {
+      if (f.path.startsWith("cache/") || !(f.path.endsWith(".py") || /^(pre2017|post2017)\//.test(f.path) || f.path.endsWith(".csv"))) continue;
+      const buf = await f.blob.arrayBuffer(); files[f.path] = buf; transfer.push(buf);
+    }
+    const results = await z.blob.arrayBuffer(); transfer.push(results);
+    const options = { source: $("#partSource").value, mode: $("#partMode").value, size: Number($("#partSize").value) || 300 };
+    await startWorker();
+    const m = await new Promise((res, rej) => {
+      const h = (e) => {
+        const d = e.data;
+        if (d.type === "log") { lines.push(d.line); st.textContent = d.line; }
+        else if (d.type === "status") st.textContent = d.text;
+        else if (d.type === "splitDone") { worker.removeEventListener("message", h); res(d); }
+        else if (d.type === "error") { worker.removeEventListener("message", h); rej(new Error(d.message)); }
+      };
+      worker.addEventListener("message", h);
+      runPipeline._reject = rej;
+      worker.postMessage({ type: "split", files, results, options }, transfer);
+    });
+    if (m.result.code !== 0 || !m.zip) throw new Error(lines.slice(-6).join("\n") || "The split did not finish.");
+    await idb.put("kv", { name: m.zipName, blob: new Blob([m.zip], { type: "application/zip" }), parts: m.result.parts, when: Date.now() }, "lastParts");
+    await renderParts();
+    const summary = lines.find((l) => / parts from /.test(l));
+    if (summary) st.insertAdjacentHTML("beforeend", `<br><span class="ok">${esc(summary.replace(/ -> .*$/, ""))}</span>`);
+  } catch (e) {
+    st.innerHTML = `<span class="bad">${esc(e.message).replace(/\n/g, "<br>")}</span>`;
+  } finally {
+    running = false; btn.disabled = false; $("#btnRun").disabled = false; runPipeline._reject = null;
+  }
+}
+async function downloadZip(key = "lastZip") {
+  const z = await idb.get("kv", key); if (!z) return;
   const url = URL.createObjectURL(z.blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: z.name });
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-async function shareZip() {
-  const z = await idb.get("kv", "lastZip"); if (!z) return;
+async function shareZip(key = "lastZip") {
+  const z = await idb.get("kv", key); if (!z) return;
   try { await navigator.share({ files: [new File([z.blob], z.name, { type: "application/zip" })], title: z.name }); }
   catch (e) { if (e.name !== "AbortError") toast(e.message); }
 }
@@ -565,8 +628,12 @@ function wire() {
   $("#btnGcd").onclick = pickGcd;
   $("#gcdInput").onchange = (e) => { gcdFile = e.target.files[0] || null; gcdHandle = null; renderGcd(); };
   $("#btnGcdForget").onclick = async () => { gcdFile = null; gcdHandle = null; $("#gcdInput").value = ""; await idb.del("kv", "gcdHandle"); renderGcd(); };
-  $("#btnDownload").onclick = downloadZip;
-  $("#btnShare").onclick = shareZip;
+  $("#btnDownload").onclick = () => downloadZip("lastZip");
+  $("#btnShare").onclick = () => shareZip("lastZip");
+  $("#btnParts").onclick = makeParts;
+  $("#btnPartsDownload").onclick = () => downloadZip("lastParts");
+  $("#btnPartsShare").onclick = () => shareZip("lastParts");
+  $("#partMode").onchange = () => show("#partSizeWrap", $("#partMode").value === "auto");
   $("#btnPick").onclick = () => $("#upInput").click();
   $("#upInput").onchange = (e) => {
     chosen = [...e.target.files];

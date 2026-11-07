@@ -76,6 +76,41 @@
     </div>
     <div id="resultExtra"></div>
   </div>
+
+  <div class="card hidden" id="partsCard">
+    <h2>Split into reading parts</h2>
+    <p class="muted small">Cuts the finished reading order into numbered Excel lists laid out like your own
+      (column A, one comic per row), e.g. <i>01 1961-1963 Birth of the Fantastic Four to Birth of the Avengers</i>.</p>
+    <div class="row2">
+      <label class="field">Reading order
+        <select id="partSource">
+          <option value="main">Main order (no alternate universes)</option>
+          <option value="universes">With alternate universes</option>
+          <option value="scenes">Scenes: page ranges and flashbacks as rows</option>
+        </select>
+      </label>
+      <label class="field">Where to cut
+        <select id="partMode">
+          <option value="lists">Same story points as my reading lists</option>
+          <option value="auto">Automatic, at big events</option>
+        </select>
+      </label>
+    </div>
+    <label class="field hidden" id="partSizeWrap">About how many comics per part
+      <input id="partSize" type="number" min="20" max="5000" step="10" value="300">
+    </label>
+    <div class="row">
+      <button id="btnParts" class="primary">Make reading parts</button>
+    </div>
+    <p id="partsStatus" class="muted small"></p>
+    <div id="partsResult" class="hidden">
+      <div class="row">
+        <button id="btnPartsDownload" class="primary">Download parts zip</button>
+        <button id="btnPartsShare" class="hidden">Share…</button>
+      </div>
+      <ul id="partsList" class="changes"></ul>
+    </div>
+  </div>
 </section>
 
 <!-- ============================== FILES ============================== -->
