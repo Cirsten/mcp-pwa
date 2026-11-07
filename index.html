@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MCP Reading Order</title>
+<meta name="description" content="Builds the Marvel Chronology master reading order from files kept in GitHub.">
+<meta name="theme-color" content="#16233a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="icons/icon.svg" alt="" width="28" height="28"><span>MCP Reading Order</span></div>
+  <div id="netState" class="pill" title="Network">…</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="run" aria-selected="true">Run</button>
+  <button role="tab" data-tab="files">Files</button>
+  <button role="tab" data-tab="setup">Setup</button>
+</nav>
+
+<main>
+<!-- ============================== RUN ============================== -->
+<section id="tab-run" class="tab">
+  <div class="card">
+    <h2>1 · Get the latest files from GitHub</h2>
+    <p class="muted" id="syncSummary">Not synced yet.</p>
+    <div class="row">
+      <button id="btnSync" class="primary">Check GitHub for updates</button>
+      <label class="check"><input type="checkbox" id="optAutoSync" checked> Always check before a run</label>
+    </div>
+    <div id="syncProgress" class="progress hidden"><div></div></div>
+    <ul id="syncChanges" class="changes"></ul>
+  </div>
+
+  <div class="card">
+    <h2>2 · GCD database <span class="tag">optional</span></h2>
+    <p class="muted">Only needed when the comic list has changed and you want new cover dates. Without it the run
+      re-uses the last <code>dates.csv</code> (saved in the repo under <code>cache/</code>).</p>
+    <div class="row">
+      <button id="btnGcd">Choose gcd.db…</button>
+      <input type="file" id="gcdInput" class="hidden" accept=".db,.sqlite,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,*/*">
+      <button id="btnGcdForget" class="ghost hidden">Forget</button>
+    </div>
+    <p id="gcdState" class="muted small">No GCD file chosen.</p>
+    <p id="datesState" class="small"></p>
+  </div>
+
+  <div class="card">
+    <h2>3 · Build the reading order</h2>
+    <details class="opts">
+      <summary>Options</summary>
+      <label class="check"><input type="checkbox" id="optForceDates"> Re-match GCD dates even if nothing changed (after updating gcd.db)</label>
+      <label class="check"><input type="checkbox" id="optSkipUniverses"> Skip the alternate universes this time</label>
+      <label class="check"><input type="checkbox" id="optSaveCache" checked> Save new GCD dates to the repo (so your other devices can use them)</label>
+      <label class="field">Extra merge options <input id="optMergeArgs" placeholder="e.g. --series-pull 0.03" autocomplete="off"></label>
+    </details>
+    <div class="row">
+      <button id="btnRun" class="primary big">Run pipeline</button>
+      <button id="btnStop" class="danger hidden">Stop</button>
+    </div>
+    <p id="runStatus" class="muted"></p>
+    <pre id="log" class="log hidden" aria-live="polite"></pre>
+  </div>
+
+  <div class="card hidden" id="resultCard">
+    <h2>Result</h2>
+    <p id="resultText"></p>
+    <div class="row">
+      <button id="btnDownload" class="primary">Download zip</button>
+      <button id="btnShare" class="hidden">Share…</button>
+    </div>
+    <div id="resultExtra"></div>
+  </div>
+</section>
+
+<!-- ============================== FILES ============================== -->
+<section id="tab-files" class="tab hidden">
+  <div class="card">
+    <h2>Add or replace files in the repo</h2>
+    <div class="row">
+      <label class="field grow">Folder
+        <select id="upFolder">
+          <option value="char">char/ - character pages (.mht) and key.mht</option>
+          <option value="universes">universes/ - alternate-universe pages</option>
+          <option value="pre2017">pre2017/ - reading lists (.xlsx), MCP-covered eras</option>
+          <option value="post2017">post2017/ - reading lists (.xlsx), 2017 onward</option>
+          <option value="">(top level) - Python scripts, aliases.csv, overrides…</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <button id="btnPick">Choose files…</button>
+      <input type="file" id="upInput" multiple class="hidden">
+      <span id="upChosen" class="muted small">No files chosen.</span>
+    </div>
+    <label class="field">Note for the change <input id="upMsg" placeholder="e.g. Updated Spider-Man page" autocomplete="off"></label>
+    <button id="btnUpload" class="primary" disabled>Upload to GitHub</button>
+    <p id="upState" class="muted small"></p>
+  </div>
+
+  <div class="card">
+    <h2>Refresh pages from chronologyproject.com <span class="tag">needs Vercel</span></h2>
+    <p class="muted">Downloads the pages listed in <code>sources.csv</code> and commits any that changed. If the site
+      blocks it, save the page from your browser and upload it above instead.</p>
+    <div id="srcList" class="srclist"></div>
+    <div class="row">
+      <button id="btnFetchSel">Fetch selected</button>
+      <button id="btnSelAll" class="ghost">Select all</button>
+    </div>
+    <p id="fetchState" class="muted small"></p>
+  </div>
+
+  <div class="card">
+    <h2>Files on this device</h2>
+    <p class="muted small" id="filesSummary"></p>
+    <input id="fileFilter" class="filter" placeholder="Filter…" autocomplete="off">
+    <div id="fileList" class="filelist"></div>
+  </div>
+</section>
+
+<!-- ============================== SETUP ============================== -->
+<section id="tab-setup" class="tab hidden">
+  <div class="card">
+    <h2>Connect to GitHub</h2>
+    <fieldset class="seg">
+      <label><input type="radio" name="mode" value="token" checked> Token on this device</label>
+      <label><input type="radio" name="mode" value="proxy"> Token in Vercel</label>
+    </fieldset>
+    <div id="modeToken">
+      <label class="field">Repository <input id="cfgRepo" placeholder="your-name/mcp-data" autocomplete="off" spellcheck="false"></label>
+      <div class="row2">
+        <label class="field">Branch <input id="cfgBranch" placeholder="main" autocomplete="off"></label>
+        <label class="field">Folder in repo <input id="cfgSubdir" placeholder="(top level)" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <label class="field">Personal access token
+        <input id="cfgToken" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="muted small">Use a <b>fine-grained</b> token limited to this one repository with
+        <b>Contents: Read and write</b>. It is stored only in this browser.</p>
+    </div>
+    <div id="modeProxy" class="hidden">
+      <label class="field">App passcode <input id="cfgPass" type="password" autocomplete="off"></label>
+      <p class="muted small">The token, repository and branch are set in Vercel
+        (<code>GITHUB_TOKEN</code>, <code>GITHUB_REPO</code>, <code>GITHUB_BRANCH</code>, <code>APP_PASSCODE</code>).
+        Files bigger than about 3 MB cannot be uploaded through Vercel; use the GitHub website for those.</p>
+    </div>
+    <div class="row">
+      <button id="btnSave" class="primary">Save and test</button>
+    </div>
+    <p id="cfgState" class="small"></p>
+  </div>
+
+  <div class="card">
+    <h2>This device</h2>
+    <p class="muted small" id="storageState"></p>
+    <div class="row">
+      <button id="btnPrep">Download Python for offline use</button>
+      <button id="btnClear" class="danger ghost">Delete downloaded files</button>
+    </div>
+    <p class="muted small">Install the app: in Chrome or Edge use <b>Install app</b> in the address bar or menu
+      (Windows), or <b>Add to Home screen / Install</b> in the menu (Android).</p>
+    <p class="muted small" id="appVersion"></p>
+  </div>
+</section>
+</main>
+
+<div id="toast" class="toast hidden" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "headers": [
+    { "source": "/sw.js", "headers": [{ "key": "cache-control", "value": "no-cache" }, { "key": "service-worker-allowed", "value": "/" }] },
+    { "source": "/(index.html|app.js|worker.js|runner.py|styles.css|manifest.webmanifest)", "headers": [{ "key": "cache-control", "value": "no-cache" }] },
+    { "source": "/vendor/(.*)", "headers": [{ "key": "cache-control", "value": "public, max-age=31536000, immutable" }] }
+  ]
+}

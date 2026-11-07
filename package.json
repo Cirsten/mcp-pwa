@@ -1,0 +1,6 @@
+{
+  "name": "mcp-reading-order-pwa",
+  "private": true,
+  "description": "PWA that runs the Marvel Chronology merge pipeline in the browser, with files kept in GitHub",
+  "engines": { "node": ">=18" }
+}
