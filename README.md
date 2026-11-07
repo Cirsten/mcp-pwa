@@ -93,6 +93,23 @@ on a computer. That keeps only what the date step reads.
   `sources.csv` (`folder,name,url`) for the headline characters and universes.
 * *Files on this device*: what the app will run with. You can save a copy of any file or delete it from the repo.
 
+**Adding files on github.com instead:** that works just as well, and **the app needs no update for new or
+changed files.** Before every run it checks GitHub, downloads only the new or changed files and drops deleted
+ones. A script Claude changes in the data repo is picked up the same way. The only exception is a script that
+needs a Python package the app does not include.
+
+The scripts recognise files by name and type, so follow these rules (full details in the data repo's
+`README.md` and in each folder's `README.md`):
+
+| Folder | Rules |
+|---|---|
+| `char/` | Name must end in `.mht`, `.mhtml` or `.html`; a file with no ending is ignored. Letter pages are `a.mht`...`z.mht`, the Key is `key.mht`, and the headline pages are `captain-america`, `hulk`, `iron-man`, `mr-fantastic`, `scarlet-witch`, `spider-man`, `storm`, `sub-mariner` (`.mht`). **Update a page under exactly the same name**: rename the browser's `Marvel Chronology Project - ...` name first, or both copies are read and that character counts twice. A new character page may have any name. |
+| `universes/` | Alternate-universe pages only, any name, with or without an ending. Replace under the same name. |
+| `pre2017/`, `post2017/` | `.xlsx` or `.csv`, comics in column A. **Start the name with the next number** (e.g. `94 2024_ ...xlsx`): it sets the order for *Split into reading parts*, and the rest of the name becomes the part's name. No notes or `.txt` files: every `.xlsx`, `.csv` and `.txt` file is read as a list. |
+
+After adding or changing **pages**, choose `gcd.db` on the next run so the new comics get cover dates (the app
+warns you). New or changed reading lists don't need it.
+
 ## What runs where
 
 ```
