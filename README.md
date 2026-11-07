@@ -59,6 +59,22 @@ GitHub → Settings → Developer settings → **Fine-grained personal access to
   | `APP_PASSCODE` | a long passphrase you choose |
 
   Then redeploy (Deployments → ⋯ → Redeploy) and choose *Token in Vercel* in the app with that passcode.
+
+  **Token vs. passcode.** In this mode the app's Setup tab asks only for an **App passcode**. That box is
+  *not* the GitHub token: it is the passphrase you saved in Vercel as `APP_PASSCODE`, shown as dots like a
+  password.
+  * The **token** (`github_pat_...`) is the real key to your GitHub repo. It stays in Vercel and never goes on
+    your phone or PC.
+  * The **passcode** lets a device use the app. The app sends it to Vercel, and Vercel uses the token only if
+    the passcode matches. Someone who finds the app's web address can't reach your repo without it.
+  * After **Save and test**, a green "Connected to <your repo> (main)" means the passcode was right and the
+    token works. Each device remembers the passcode, so you enter it once per device. Enter it again only if
+    you change `APP_PASSCODE` in Vercel or clear the browser's data.
+  * "Using 0 B of storage" under *This device* just means nothing is downloaded yet. Go to the **Run** tab
+    and click **Check GitHub for updates**.
+  * When the token expires, make a new one on GitHub and replace `GITHUB_TOKEN` in Vercel, then redeploy.
+    Nothing changes on your devices.
+
   Limits of this mode: one upload can't be bigger than about 3 MB, because Vercel caps a request at 4.5 MB.
   Upload bigger pages on github.com or switch to "Token on this device". Downloads of big files are not
   affected, because the app fetches them straight from GitHub with a short-lived link.
