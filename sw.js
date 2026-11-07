@@ -2,10 +2,10 @@
  * App files: network first (so updates arrive), cached copy when offline.
  * Python runtime (vendor/): cached forever once downloaded (the folder name carries the version).
  * GitHub, Vercel functions and the website are never cached here. */
-const SHELL = "mcp-shell-v2";
+const SHELL = "mcp-shell-v3";
 const VENDOR = "mcp-vendor-pyodide-0.27.7";
 const SHELL_FILES = ["./", "index.html", "styles.css", "app.js", "worker.js", "runner.py", "manifest.webmanifest",
-  "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
+  "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-512-maskable.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));

@@ -30,7 +30,12 @@ body {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; min-width: 0; }
+.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .brand { font-size: 15px; gap: 8px; } .topright .pill { max-width: 28vw; } }
+.topright { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.topright .pill { overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+button.install { min-height: 32px; padding: 4px 12px; font-size: 13px; background: var(--accent); color: var(--accent-text); border-color: var(--accent); white-space: nowrap; }
 .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
 .pill.ok { color: var(--ok); border-color: currentColor; }
 .pill.bad { color: var(--warn); border-color: currentColor; }

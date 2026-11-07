@@ -40,9 +40,18 @@ GitHub → Settings → Developer settings → **Fine-grained personal access to
 ### 3. Deploy the app on Vercel
 1. Put this folder in its own GitHub repo (`mcp-pwa`), then on vercel.com: **Add New → Project → Import** that
    repo. Framework preset: **Other**. No build command or output directory is needed. Click **Deploy**.
-2. Open the `https://<project>.vercel.app` address on each device and **install** it:
-   * Windows (Chrome or Edge): the *Install app* icon in the address bar, or menu → *Apps → Install*.
-   * Android (Chrome): menu ⋮ → *Add to Home screen* / *Install app*.
+2. Open the `https://<project>.vercel.app` address on each device and **install** it. It is a full
+   installable app (PWA): its own icon, its own window, and it works offline.
+   * **Easiest:** press the red **Install app** button at the top of the app. Chrome and Edge show it as soon
+     as the app can be installed, and it disappears once installed.
+   * Windows, if no button: Chrome uses the install icon at the right of the address bar, or menu ⋮ → *Cast,
+     save and share → Install page as app*. Edge uses menu ⋯ → *Apps → Install this site as an app*.
+   * Android, if no button: Chrome menu ⋮ → *Add to Home screen → Install*.
+   * Once installed, open it from the Start menu / taskbar (Windows) or the home screen (Android). Long-press
+     (Android) or right-click (Windows) the icon for the shortcuts *Run pipeline* and *Files*. **Setup → This
+     device** says whether you are in the installed app.
+   * Updates install themselves: when a new version is on Vercel, the app picks it up the next time it is
+     opened while online (close it fully and reopen if *App version* in Setup has not changed).
 
 ### 4. Connect (Setup tab). Choose one:
 * **Token on this device**: enter `your-name/mcp-data`, branch `main` and the token. The token is stored only

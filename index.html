@@ -14,7 +14,10 @@
 <body>
 <header class="top">
   <div class="brand"><img src="icons/icon.svg" alt="" width="28" height="28"><span>MCP Reading Order</span></div>
-  <div id="netState" class="pill" title="Network">…</div>
+  <div class="topright">
+    <button id="btnInstall" class="install hidden" title="Install this app on this device">Install app</button>
+    <div id="netState" class="pill" title="Network">…</div>
+  </div>
 </header>
 
 <nav class="tabs" role="tablist">
@@ -197,8 +200,12 @@
       <button id="btnPrep">Download Python for offline use</button>
       <button id="btnClear" class="danger ghost">Delete downloaded files</button>
     </div>
-    <p class="muted small">Install the app: in Chrome or Edge use <b>Install app</b> in the address bar or menu
-      (Windows), or <b>Add to Home screen / Install</b> in the menu (Android).</p>
+    <p class="small" id="installState"></p>
+    <p class="muted small" id="installHelp">To install: press <b>Install app</b> at the top when it appears. Otherwise,
+      on <b>Windows</b> (Chrome or Edge) use the install icon at the right end of the address bar, or the menu ⋮ /
+      ⋯ → <b>Cast, save and share → Install page as app</b> (Chrome) or <b>Apps → Install this site as an app</b> (Edge).
+      On <b>Android</b> (Chrome) use the menu ⋮ → <b>Add to Home screen → Install</b>. The installed app opens
+      in its own window, has its own icon, and works offline.</p>
     <p class="muted small" id="appVersion"></p>
   </div>
 </section>

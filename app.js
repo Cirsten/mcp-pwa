@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -665,9 +665,33 @@ function wire() {
   window.addEventListener("online", updateNet); window.addEventListener("offline", updateNet);
 }
 
+/* ------------------------------------------------------------------ install as an app */
+let installPrompt = null;
+const isInstalled = () => matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: window-controls-overlay)").matches || navigator.standalone === true;
+function renderInstall() {
+  const installed = isInstalled();
+  show("#btnInstall", Boolean(installPrompt) && !installed);
+  $("#installState").innerHTML = installed
+    ? `<span class="ok">Installed: you are using the app version.</span>`
+    : installPrompt ? `Not installed yet. Press <b>Install app</b> at the top.`
+      : `Not installed in this window (or already installed - then open it from your Start menu / home screen).`;
+  show("#installHelp", !installed);
+}
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; renderInstall(); });
+window.addEventListener("appinstalled", () => { installPrompt = null; renderInstall(); toast("Installed. Open MCP Reading Order from your Start menu or home screen."); });
+
 async function main() {
-  wire(); fillCfg(); updateNet();
+  wire(); fillCfg(); updateNet(); renderInstall();
+  $("#btnInstall").onclick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") installPrompt = null;
+    renderInstall();
+  };
+  const wanted = new URLSearchParams(location.search).get("tab");
   if (!configured()) selectTab("setup");
+  else if (["run", "files", "setup"].includes(wanted)) selectTab(wanted);
   $("#appVersion").textContent = `App version ${APP_VERSION} · Python 3.12 (Pyodide 0.27.7)`;
   await Promise.all([renderSync(), renderFiles(), renderSources(), initGcd(), renderResult(), renderDates()]);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
