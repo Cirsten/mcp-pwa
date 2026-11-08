@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.2.2";
+const APP_VERSION = "1.2.3";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -436,7 +436,7 @@ async function renderResult() {
     (files.length ? `<br><span class="muted small">${esc(files.join(", "))}</span>` : "");
   const file = new File([z.blob], z.name, { type: "application/zip" });
   shareFiles.lastZip = file;
-  show("#btnShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
+  show("#btnShare", canShareFile(file));
   const ok = !z.result || z.result.code === 0;
   show("#partsCard", ok && files.includes("reading_order.csv"));
   const uni = $("#partSource option[value=universes]");
@@ -457,7 +457,7 @@ async function renderParts() {
   for (const n of p.parts) { const li = document.createElement("li"); li.textContent = n.replace(/\.xlsx$/, ""); ul.appendChild(li); }
   const file = new File([p.blob], p.name, { type: "application/zip" });
   shareFiles.lastParts = file;
-  show("#btnPartsShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
+  show("#btnPartsShare", canShareFile(file));
 }
 
 async function makeParts() {
@@ -511,6 +511,9 @@ async function downloadZip(key = "lastZip") {
 // The files are kept ready so Share can start at once: an await before navigator.share() can use up the
 // click's permission, and the browser then answers "Permission denied".
 const shareFiles = {};
+// Chrome and Edge on Windows refuse to share zip files, so the Share button is not offered there.
+const onWindows = (navigator.userAgentData && navigator.userAgentData.platform === "Windows") || /Windows/i.test(navigator.userAgent);
+const canShareFile = (file) => !onWindows && Boolean(navigator.canShare && navigator.canShare({ files: [file] }));
 function shareZip(key = "lastZip") {
   const file = shareFiles[key];
   if (!file) return;
