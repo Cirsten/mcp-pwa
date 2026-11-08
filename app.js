@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -242,11 +242,54 @@ async function chooseDatesCache() {
   if (repo && loc) return loc.at > repo.at ? loc : repo;
   return repo || loc;
 }
+const stampOf = async (blob) => { try { return JSON.parse(await blob.text()).dates_generated_at || ""; } catch (e) { return ""; } };
+
+/** true when this device holds GCD dates that the repo lacks or has an older copy of */
+async function datesNeedUpload() {
+  const local = await idb.get("kv", "localCache");
+  if (!local || !local.dates) return false;
+  const repoD = await idb.get("files", "cache/dates.csv");
+  if (!repoD) return true;
+  const repoS = await idb.get("files", "cache/pipeline_state.json");
+  const la = local.state ? await stampOf(local.state) : "";
+  const ra = repoS ? await stampOf(repoS.blob) : "";
+  return Boolean(la) && la > ra;
+}
+
+async function saveDatesToRepo(datesBuf, stateBuf) {
+  const changes = [{ path: prefix() + "cache/dates.csv", data: datesBuf }];
+  if (stateBuf) changes.push({ path: prefix() + "cache/pipeline_state.json", data: stateBuf });
+  await gh().commit(changes, "Update GCD dates cache (from the app)");
+  for (const c of changes) await storeLocal(c.path.slice(prefix().length), c.data);
+  await renderDates();
+}
+
+function retryButton(fn, label = "Try again") {
+  const b = Object.assign(document.createElement("button"), { className: "link", textContent: label });
+  b.onclick = () => { b.disabled = true; fn(); };
+  return b;
+}
+
 async function renderDates() {
   const c = await chooseDatesCache();
-  $("#datesState").innerHTML = c
+  const el = $("#datesState");
+  el.innerHTML = c
     ? `Saved dates: <b>${c.at ? esc(new Date(c.at).toLocaleString()) : "date unknown"}</b> (from ${c.from}).`
     : `<span class="warn">No dates.csv yet - for the best order, choose gcd.db for the first run.</span>`;
+  if (configured() && (await datesNeedUpload())) {
+    const local = await idb.get("kv", "localCache");
+    el.insertAdjacentHTML("beforeend", ` <span class="warn">Not in the repo yet, so your other devices can't use them.</span> `);
+    const save = async () => {
+      try {
+        await saveDatesToRepo(await local.dates.arrayBuffer(), local.state ? await local.state.arrayBuffer() : null);
+        toast("GCD dates saved to the repo.");
+      } catch (e) {
+        toast("Could not save the dates: " + e.message, 8000);
+        await renderDates();
+      }
+    };
+    el.appendChild(retryButton(save, "Save to repo"));
+  }
 }
 
 /* ------------------------------------------------------------------ the Python worker */
@@ -347,18 +390,24 @@ async function afterRun(m, secs, hadGcd) {
 
   const extra = $("#resultExtra"); extra.innerHTML = "";
   if (r.datesStale && !hadGcd) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The comic list changed since the GCD dates were made, so some new comics have no cover date. Run again with gcd.db chosen to refresh them.</p>`);
-  if (r.datesMade && configured()) {
-    const changes = [{ path: prefix() + "cache/dates.csv", data: m.cache["dates.csv"] }];
-    if (m.cache[".pipeline_state.json"]) changes.push({ path: prefix() + "cache/pipeline_state.json", data: m.cache[".pipeline_state.json"] });
+  if (m.cache["dates.csv"] && configured() && (r.datesMade || (await datesNeedUpload()))) {
+    // also when the dates were made earlier but never reached the repo (offline, option off, failed save)
+    const p = document.createElement("p"); p.className = "small"; extra.appendChild(p);
     const save = async () => {
+      p.textContent = "Saving the GCD dates to the repo…";
       try {
-        await gh().commit(changes, "Update GCD dates cache (from the app)");
-        for (const c of changes) await storeLocal(c.path.slice(prefix().length), c.data);
-        extra.insertAdjacentHTML("beforeend", `<p class="ok small">New GCD dates saved to the repo (cache/dates.csv).</p>`);
-        await renderDates();
-      } catch (e) { extra.insertAdjacentHTML("beforeend", `<p class="bad small">Could not save the dates to the repo: ${esc(e.message)}</p>`); }
+        await saveDatesToRepo(m.cache["dates.csv"], m.cache[".pipeline_state.json"]);
+        p.innerHTML = `<span class="ok">GCD dates saved to the repo (cache/dates.csv) - your other devices will use them.</span>`;
+      } catch (e) {
+        p.innerHTML = `<span class="bad">Could not save the dates to the repo: ${esc(e.message)}</span> `;
+        p.appendChild(retryButton(save));
+      }
     };
     if ($("#optSaveCache").checked && navigator.onLine) await save();
+    else {
+      p.innerHTML = `These GCD dates are not in the repo yet, so your other devices can't use them. `;
+      p.appendChild(retryButton(save, "Save to repo"));
+    }
   }
   const changed = Object.entries(m.changed || {}).filter(([, v]) => v);
   if (changed.length && configured()) {
