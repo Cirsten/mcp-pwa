@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.2.2";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -435,6 +435,7 @@ async function renderResult() {
   $("#resultText").innerHTML = `<b>${esc(z.name)}</b> · ${fmtSize(z.blob.size)} · ${files.length} CSV files · made ${esc(new Date(z.when).toLocaleString())}` +
     (files.length ? `<br><span class="muted small">${esc(files.join(", "))}</span>` : "");
   const file = new File([z.blob], z.name, { type: "application/zip" });
+  shareFiles.lastZip = file;
   show("#btnShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
   const ok = !z.result || z.result.code === 0;
   show("#partsCard", ok && files.includes("reading_order.csv"));
@@ -455,6 +456,7 @@ async function renderParts() {
   const ul = $("#partsList"); ul.innerHTML = "";
   for (const n of p.parts) { const li = document.createElement("li"); li.textContent = n.replace(/\.xlsx$/, ""); ul.appendChild(li); }
   const file = new File([p.blob], p.name, { type: "application/zip" });
+  shareFiles.lastParts = file;
   show("#btnPartsShare", Boolean(navigator.canShare && navigator.canShare({ files: [file] })));
 }
 
@@ -506,10 +508,23 @@ async function downloadZip(key = "lastZip") {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-async function shareZip(key = "lastZip") {
-  const z = await idb.get("kv", key); if (!z) return;
-  try { await navigator.share({ files: [new File([z.blob], z.name, { type: "application/zip" })], title: z.name }); }
-  catch (e) { if (e.name !== "AbortError") toast(e.message); }
+// The files are kept ready so Share can start at once: an await before navigator.share() can use up the
+// click's permission, and the browser then answers "Permission denied".
+const shareFiles = {};
+function shareZip(key = "lastZip") {
+  const file = shareFiles[key];
+  if (!file) return;
+  const fallback = (why) => {
+    downloadZip(key);
+    toast(`${why} The zip was downloaded instead - attach it from your Downloads folder.`, 7000);
+  };
+  let p;
+  try { p = navigator.share({ files: [file], title: file.name }); }
+  catch (e) { fallback("This browser can't share this file."); return; }
+  p.catch((e) => {
+    if (e.name === "AbortError") return; // the person closed the share window
+    fallback(e.name === "NotAllowedError" ? "This browser doesn't allow sharing zip files." : `Sharing failed (${e.message}).`);
+  });
 }
 
 /* ------------------------------------------------------------------ FILES tab */
