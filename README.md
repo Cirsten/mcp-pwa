@@ -82,7 +82,7 @@ GitHub → Settings → Developer settings → **Fine-grained personal access to
   * "Using 0 B of storage" under *This device* just means nothing is downloaded yet. Go to the **Run** tab
     and click **Check GitHub for updates**.
   * When the token expires, make a new one on GitHub and replace `GITHUB_TOKEN` in Vercel, then redeploy.
-    Nothing changes on your devices.
+    Nothing changes on your devices. See *Secrets, passwords and settings* below for every reset step.
 
   Limits of this mode: one upload can't be bigger than about 3 MB, because Vercel caps a request at 4.5 MB.
   Upload bigger pages on github.com or switch to "Token on this device". Downloads of big files are not
@@ -134,6 +134,98 @@ The scripts recognise files by name and type, so follow these rules (full detail
 
 After adding or changing **pages**, choose `gcd.db` on the next run so the new comics get cover dates (the app
 warns you). New or changed reading lists don't need it.
+
+## Secrets, passwords and settings: how to recover, reset or revoke each one
+
+Nothing secret is stored in either GitHub repository. Everything secret is in one of three places: **GitHub**
+(your account and the token), **Vercel** (the environment variables), or **the browser on each device**
+(the passcode or token you typed into Setup). Nothing can be "recovered" from the app itself. Every secret is
+reset at its source and then entered again where it is used.
+
+### At a glance
+
+| What | Where it lives | Can you see it again? | How to reset it |
+|---|---|---|---|
+| GitHub token (`github_pat_...`) | GitHub; a copy in Vercel `GITHUB_TOKEN` (or on a device in *Token on this device* mode) | **No.** GitHub shows it once | Regenerate on GitHub, then update Vercel (or each device) |
+| App passcode | Vercel `APP_PASSCODE`; remembered by each device's browser | In Vercel, unless you marked it *Sensitive* | Change it in Vercel, redeploy, enter it on each device |
+| `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_SUBDIR` | Vercel environment variables | Yes, they are not secret | Edit in Vercel, redeploy |
+| Repo / branch / folder (*Token on this device* mode) | each device's browser | Yes, in the Setup tab | Retype in Setup and press *Save and test* |
+| GitHub account password / 2-factor codes | GitHub | No | github.com/password_reset, or your 2FA recovery codes |
+| Vercel account login | Vercel (usually *Continue with GitHub* or email) | No | Sign in again with the same method; email sign-in sends a fresh link |
+
+### GitHub token (`GITHUB_TOKEN`)
+**Symptoms:** *Save and test* or *Check GitHub for updates* says **"GitHub 401 (token or passcode wrong /
+expired)"** while the passcode is right; or **"GitHub 404 ... the token cannot see this repo"** after the repo
+was renamed or the token was limited to another repo. Fine-grained tokens expire on the date you chose, and
+GitHub emails you about a week before.
+
+**It cannot be recovered.** GitHub only shows a token once. To get a working one:
+1. github.com → your picture → **Settings → Developer settings → Personal access tokens → Fine-grained
+   tokens**.
+2. Either click the existing token (e.g. `mcp app`) and press **Regenerate token**, which keeps the same repo
+   and permissions and lets you pick a new expiry; or **Generate new token** with: *Only select repositories*
+   → your data repo, and *Repository permissions → Contents: Read and write*.
+3. Copy the new `github_pat_...` value (it is shown once).
+4. Put it where the app uses it:
+   * **Token in Vercel mode:** Vercel → your app project → **Settings → Environment Variables** → `GITHUB_TOKEN` →
+     **⋯ → Edit** → paste → **Save**. Then **Deployments → ⋯ (top deployment) → Redeploy**. Variables only take
+     effect after a redeploy. Nothing changes on your devices.
+   * **Token on this device mode:** on each device, **Setup** → paste into *Personal access token* → **Save and
+     test**.
+
+**If the token may have leaked** (pasted somewhere public, a device lost in *Token on this device* mode):
+delete it straight away on the same GitHub page (**Delete**, or **Revoke** on older pages). It stops working
+at once. Then make a new one as above. GitHub keeps the full history of your repo, so any unwanted change made
+with a leaked token can be undone (repo → **Commits**).
+
+### App passcode (`APP_PASSCODE`)
+**Symptoms:** *Save and test* says **"Wrong passcode."**
+
+**Forgot it:** Vercel → project → **Settings → Environment Variables** → `APP_PASSCODE` → click to reveal it.
+If you marked it **Sensitive**, Vercel will not show it. Reset it instead:
+1. `APP_PASSCODE` → **⋯ → Edit** → type a new passphrase → **Save**. (A Sensitive variable can also be
+   deleted and added again with the same name.)
+2. **Deployments → ⋯ → Redeploy.**
+3. On each device: **Setup → Token in Vercel** → type the new passcode → **Save and test**.
+
+**Lost or sold a device, or someone else knows the passcode:** change it as above. Every device still using the
+old passcode is locked out at once. The GitHub token never left Vercel, so it does not need changing.
+
+### `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_SUBDIR`
+Not secret. Check or fix them in Vercel → **Settings → Environment Variables**, then **Redeploy**.
+* `GITHUB_REPO` is `owner/name` exactly, e.g. `Cirsten/mcp-self-sorting`. Update it if you rename the repo or move
+  it to another account, and make sure the token is allowed to see the new repo.
+* `GITHUB_BRANCH` is normally `main`. `GITHUB_SUBDIR` is only needed if the data is in a subfolder; leave it
+  out otherwise.
+* **"Server mode is not set up"** means `GITHUB_TOKEN`, `GITHUB_REPO` or `APP_PASSCODE` is missing, or the
+  project was not redeployed after adding them.
+* **"No Vercel functions here"** means the app was opened from somewhere other than the Vercel project
+  (for example a copied file). Open the `https://<project>.vercel.app` address.
+* Tick **Production** (and **Preview** if you test branch previews) for each variable, or that deployment won't
+  see it.
+
+### Where each device keeps things, and how to wipe it
+* The passcode (or the token, in *Token on this device* mode) and the repo settings are kept in that browser's
+  storage for the app's web address.
+* **Setup → Delete downloaded files** removes the downloaded repo files, saved dates and last results, but
+  **keeps** the passcode/token, so the device stays connected.
+* **To remove everything, the passcode or token included** (for example before giving a device away):
+  * Windows (Chrome / Edge): open the app's address, click the icon left of the address → **Site settings →
+    Delete data** (Chrome) / **Cookies and site permissions → Manage and delete cookies and site data → Delete**
+    (Edge). Uninstall the installed app as well: Start menu → right-click *MCP Reading Order* → **Uninstall**.
+  * Android (Chrome): ⋮ → **Settings → Site settings → All sites** → the app's address → **Delete / Clear &
+    reset**. Remove the home-screen app: long-press its icon → **Uninstall** / **Remove**.
+  * The safest step for a device you no longer have is to **change the passcode** (or delete the token, in
+    *Token on this device* mode). That works without the device.
+* **Forgotten gcd.db file:** **Forget** in the GCD card, then **Choose gcd.db...** again.
+
+### The GitHub repo itself
+* The data repo must stay **private**. Check under repo → **Settings → General → Danger Zone → Change
+  visibility**.
+* Every change the app makes is a normal commit, so anything can be restored from **Commits** (or **Branches**
+  for old branches) on GitHub.
+* `cache/dates.csv` is not secret. Delete it on GitHub to make the next run that has gcd.db match every comic
+  again.
 
 ## What runs where
 
