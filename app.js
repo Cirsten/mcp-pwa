@@ -389,7 +389,7 @@ async function afterRun(m, secs, hadGcd) {
   $("#runStatus").innerHTML = ok ? `<span class="ok">Finished in ${secs}s.</span>` : `<span class="bad">The pipeline stopped with an error (code ${r.code}) - see the log. The zip still has whatever was produced.</span>`;
 
   const extra = $("#resultExtra"); extra.innerHTML = "";
-  if (r.datesOld) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The <b>gcd_series</b> and <b>gcd_year</b> columns (the matched GCD volume) are empty because the saved dates were made before they existed. Choose gcd.db and run once to fill them; after that every device gets them from the repo.</p>`);
+  if (r.datesOld) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The <b>gcd_volume</b> column (the matched GCD volume, e.g. "Avengers (2018)") is empty because the saved dates were made before it existed. Choose gcd.db and run once to fill it; after that every device gets it from the repo.</p>`);
   if (r.datesStale && !hadGcd) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The comic list changed since the GCD dates were made, so some new comics have no cover date. Run again with gcd.db chosen to refresh them.</p>`);
   if (m.cache["dates.csv"] && configured() && (r.datesMade || (await datesNeedUpload()))) {
     // also when the dates were made earlier but never reached the repo (offline, option off, failed save)
