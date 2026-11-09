@@ -104,6 +104,18 @@ Avengers.xlsx`. You choose:
 
 It runs `split_reading_order.py` from the data repo, so the repo needs pipeline v7 or later.
 
+The zip also holds the parts as **Smart CSV Converter "SPC" CSVs** in `spc/`: one per part, named like the
+converter names them (e.g. `01_1961_1963_birth_of_the_fantastic_four_to_birth_of_the_avengers.csv`), plus
+`all_parts_<kind>.csv` with every part in one file. The columns are
+`Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume`:
+* **SPC ERO** restarts at 1 for every part. **SPC RO** runs from 1 through all parts, so part 02 carries on
+  where part 01 stopped.
+* **published** is the GCD cover date as `mm/dd/yyyy`. GCD often gives only the month, and then the day is 01.
+* **GCD volume** is the matched GCD volume, `name (first year)`.
+* Both of those are empty for comics without a GCD match, and until you run once with gcd.db (data repo v8).
+* **SPC Event** is the part's name. Every value is quoted, exactly as the converter writes it.
+* In the "scenes" kind, a comic cited several times in a row (different page ranges) is listed once.
+
 **Save to GitHub** (next to *Download parts zip*) puts the parts on GitHub so every device has them. GitHub keeps
 **one file of each kind**, and saving a new set replaces it:
 

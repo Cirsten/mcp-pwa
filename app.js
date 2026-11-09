@@ -6,7 +6,7 @@ const APP_VERSION = "1.4.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
-const PROXY_UPLOAD_LIMIT = 3_000_000; // Vercel functions accept ~4.5 MB per request; base64 adds a third
+const PROXY_UPLOAD_LIMIT = 3_300_000; // Vercel functions accept 4.5 MB per request; base64 adds a third (3.3 MB -> 4.4 MB)
 const DEFAULT_SOURCES = "abcdefghijklmnopqrstuvwxyz".split("").map((l) => ["char", l, `https://chronologyproject.com/${l}.php`])
   .concat([["char", "key", "https://chronologyproject.com/key.php"]]);
 
