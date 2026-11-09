@@ -157,6 +157,12 @@ each comic was matched to, written `name (first year)`, e.g. `Avengers (2018)`. 
 (data repo v8), choose `gcd.db` and run once to fill it. Until then the Result card says why it is empty. After
 that, every device gets it from `cache/dates.csv`.
 
+**Hand matches:** if the data repo has `hand_matches/matches.json` (from the Comic Vine matcher app), the GCD
+step uses those matches ahead of its own guess (data repo v9). After replacing that file with a newer export, run
+once with gcd.db to apply it. Until then the Result card says the new hand matches aren't used yet. The file is
+about 6.5 MB, so upload it on github.com, or in the app with *Token on this device*. Vercel mode takes only about
+3 MB per file, but `matches.json.gz` (about 1.6 MB) works there too.
+
 **When do I need gcd.db?** Only when the list of comics changed, meaning new or updated pages. The app warns you
 when the saved dates are older than the comic list. On Windows Chrome/Edge it remembers the file between
 sessions. On Android, pick it each time. To make it smaller first, run `python3 gcd_slim.py /path/to/gcd.db`
@@ -185,8 +191,9 @@ The scripts recognise files by name and type, so follow these rules (full detail
 | `universes/` | Alternate-universe pages only, any name, with or without an ending. Replace under the same name. |
 | `pre2017/`, `post2017/` | `.xlsx` or `.csv`, comics in column A. **Start the name with the next number** (e.g. `94 2024_ ...xlsx`): it sets the order for *Split into reading parts*, and the rest of the name becomes the part's name. No notes or `.txt` files: every `.xlsx`, `.csv` and `.txt` file is read as a list. |
 
-After adding or changing **pages**, choose `gcd.db` on the next run so the new comics get cover dates (the app
-warns you). New or changed reading lists don't need it.
+After adding or changing **pages**, or replacing the hand matches in `hand_matches/`, choose `gcd.db` on the
+next run so the new comics get cover dates and matches (the app warns you). New or changed reading lists don't
+need it.
 
 ## Secrets, passwords and settings: how to recover, reset or revoke each one
 

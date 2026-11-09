@@ -98,9 +98,18 @@ def snapshot():
 _inputs_unchanged = set()  # repo files the run left as they were: not put in the results zip
 
 
+def _read_state():
+    try:
+        with open(os.path.join(WORK, ".pipeline_state.json")) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def run(opts_json):
     opts = json.loads(opts_json)
     before = snapshot()
+    state_before = _read_state()
     argv = ["run_pipeline.py"]
     if opts.get("db"):
         argv += ["--db", opts["db"]]
@@ -125,7 +134,11 @@ def run(opts_json):
     if os.path.exists(state_path):
         with open(state_path) as f:
             state = json.load(f)
-    dates_made = before.get("dates.csv") != after.get("dates.csv") and after.get("dates.csv")
+    # new dates = dates.csv changed, OR the GCD step ran and recorded what it used (entries / hand matches)
+    # even though dates.csv came out the same - either way the saved state must reach the other devices
+    strip = lambda d: {k: v for k, v in d.items() if k not in ("db_path", "dates_generated_at")}  # noqa: E731
+    gcd_ran = strip(state) != strip(state_before)
+    dates_made = after.get("dates.csv") and (before.get("dates.csv") != after.get("dates.csv") or gcd_ran)
     if dates_made:
         state["dates_generated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     state.pop("db_path", None)  # a path inside the app means nothing on another device
@@ -138,12 +151,21 @@ def run(opts_json):
     _inputs_unchanged.clear()
     _inputs_unchanged.update(p for p, h in before.items() if after.get(p) == h and p != "dates.csv")
     created = sorted(p for p in after if p not in before and "/" not in p)
+    hand_stale = False  # hand matches (hand_matches/) changed since the dates were made: needs a run with gcd.db
+    hand_files = [os.path.join(WORK, "hand_matches", n) for n in ("matches.json", "matches.json.gz")]
+    if os.path.isdir(os.path.join(WORK, "hand_matches")):
+        hand_files += sorted(os.path.join(WORK, "hand_matches", n) for n in os.listdir(os.path.join(WORK, "hand_matches"))
+                             if n.endswith(".zip"))
+    hand_file = next((f for f in hand_files if os.path.exists(f)), None)
+    if after.get("dates.csv"):
+        hand_stale = state.get("hand_hash") != (_sha256(hand_file) if hand_file else None)
     dates_old = False
     if after.get("dates.csv"):
         with open(os.path.join(WORK, "dates.csv"), encoding="utf-8") as f:
             dates_old = "gcd_series_name" not in f.readline()  # made before the GCD volume columns existed
     return json.dumps({
         "code": code, "seconds": round(time.time() - t0, 1), "datesMade": bool(dates_made), "datesOld": dates_old,
+        "handStale": hand_stale,
         "datesStale": dates_stale, "hasDates": bool(after.get("dates.csv")),
         "changedInputs": changed, "created": created,
     })

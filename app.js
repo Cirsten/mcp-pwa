@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.6.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -315,6 +315,7 @@ async function runPipeline() {
   running = true;
   const btn = $("#btnRun"); btn.disabled = true; show("#btnStop", true); show("#resultCard", false);
   const logEl = $("#log"); logEl.textContent = ""; show(logEl, true);
+  $("#runStatus").textContent = "Starting…"; // clear the previous run's "Finished" straight away
   const status = (t) => { $("#runStatus").textContent = t; };
   const addLog = (l) => { logEl.textContent += l + "\n"; if (logEl.scrollHeight - logEl.scrollTop < logEl.clientHeight + 120) logEl.scrollTop = logEl.scrollHeight; };
   try {
@@ -391,6 +392,7 @@ async function afterRun(m, secs, hadGcd) {
 
   const extra = $("#resultExtra"); extra.innerHTML = "";
   if (r.datesOld) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The <b>gcd_volume</b> column (the matched GCD volume, e.g. "Avengers (2018)") is empty because the saved dates were made before it existed. Choose gcd.db and run once to fill it; after that every device gets it from the repo.</p>`);
+  if (r.handStale && !hadGcd) extra.insertAdjacentHTML("beforeend", `<p class="warn small">Your hand matches (<code>hand_matches/</code>) have changed since the GCD dates were made, so they are not used yet. Choose gcd.db and run again to apply them.</p>`);
   if (r.datesStale && !hadGcd) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The comic list changed since the GCD dates were made, so some new comics have no cover date. Run again with gcd.db chosen to refresh them.</p>`);
   if (m.cache["dates.csv"] && configured() && (r.datesMade || (await datesNeedUpload()))) {
     // also when the dates were made earlier but never reached the repo (offline, option off, failed save)
@@ -649,7 +651,7 @@ function shareZip(key = "lastZip") {
 
 /* ------------------------------------------------------------------ FILES tab */
 const GROUPS = [["char/", "Character pages (char/)"], ["universes/", "Universes"], ["pre2017/", "Reading lists - pre 2017"],
-  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"], ["outputs/", "Saved reading parts and MCRL tables (outputs/)"]];
+  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"], ["outputs/", "Saved reading parts and MCRL tables (outputs/)"], ["hand_matches/", "Hand matches from the Comic Vine matcher (hand_matches/)"]];
 async function renderFiles() {
   const files = await localFiles();
   const q = $("#fileFilter").value.trim().toLowerCase();
