@@ -104,6 +104,20 @@ Avengers.xlsx`. You choose:
 
 It runs `split_reading_order.py` from the data repo, so the repo needs pipeline v7 or later.
 
+**Save to GitHub** (next to *Download parts zip*) puts the parts on GitHub so every device has them. GitHub keeps
+**one file of each kind**, and saving a new set replaces it:
+
+| Reading order | File in the data repo |
+|---|---|
+| Main order | `outputs/reading_parts_main.zip` |
+| With alternate universes | `outputs/reading_parts_universes.zip` |
+| Scenes | `outputs/reading_parts_scenes.zip` |
+
+Whether the set was cut at your lists or automatically is in the commit message, and older versions remain in
+the file's *History* on GitHub. On another device, open **Files → Saved reading parts → Save** to download one.
+The button turns grey once that exact set is saved. The parts never go into `pre2017/` or `post2017/`, where the
+pipeline would read them back in as your own lists.
+
 **When do I need gcd.db?** Only when the list of comics changed, meaning new or updated pages. The app warns you
 when the saved dates are older than the comic list. On Windows Chrome/Edge it remembers the file between
 sessions. On Android, pick it each time. To make it smaller first, run `python3 gcd_slim.py /path/to/gcd.db`

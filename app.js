@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.2.3";
+const APP_VERSION = "1.3.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -336,7 +336,7 @@ async function runPipeline() {
     status("Preparing files…");
     const files = {}, transfer = [];
     for (const f of stored) {
-      if (f.path.startsWith("cache/")) continue;
+      if (f.path.startsWith("cache/") || f.path.startsWith("outputs/")) continue;
       const buf = await f.blob.arrayBuffer(); files[f.path] = buf; transfer.push(buf);
     }
     const cache = await chooseDatesCache();
@@ -448,6 +448,11 @@ async function renderResult() {
 }
 
 /* ------------------------------------------------------------------ reading parts */
+const PART_LABELS = { main: "main order", universes: "with alternate universes", scenes: "scenes" };
+const partsSource = (p) => p.source || ((p.name.match(/^reading_parts_(main|universes|scenes)_/) || [])[1]) || "main";
+const partsMode = (p) => p.mode || ((p.name.match(/_(lists|auto)_/) || [])[1]) || "lists";
+const partsRepoPath = (source) => `outputs/reading_parts_${source}.zip`; // one file per kind; a new save replaces it
+
 async function renderParts() {
   const p = await idb.get("kv", "lastParts");
   show("#partsResult", Boolean(p));
@@ -458,6 +463,36 @@ async function renderParts() {
   const file = new File([p.blob], p.name, { type: "application/zip" });
   shareFiles.lastParts = file;
   show("#btnPartsShare", canShareFile(file));
+  show("#btnPartsGithub", configured());
+  const rel = partsRepoPath(partsSource(p));
+  const there = await idb.get("files", rel);
+  const same = there && there.sha === (await gitBlobSha(await p.blob.arrayBuffer()));
+  $("#btnPartsGithub").disabled = Boolean(same);
+  $("#partsGithubState").innerHTML = same
+    ? `<span class="ok">Saved on GitHub as <code>${esc(rel)}</code>.</span>`
+    : there ? `<span class="muted">GitHub has an older <code>${esc(rel)}</code>; <b>Save to GitHub</b> replaces it.</span>`
+      : `<span class="muted">Not on GitHub yet. <b>Save to GitHub</b> stores it as <code>${esc(rel)}</code>.</span>`;
+}
+
+async function savePartsToGithub() {
+  const btn = $("#btnPartsGithub"); const st = $("#partsGithubState");
+  const p = await idb.get("kv", "lastParts");
+  if (!p || !configured()) return;
+  btn.disabled = true;
+  const source = partsSource(p), rel = partsRepoPath(source);
+  st.textContent = `Saving to GitHub as ${rel}…`;
+  try {
+    const buf = await p.blob.arrayBuffer();
+    const how = partsMode(p) === "auto" ? "cut automatically" : "cut at my reading lists";
+    await gh().commit([{ path: prefix() + rel, data: buf }],
+      `Save reading parts: ${PART_LABELS[source]}, ${how}, ${p.parts.length} parts (from the app)`);
+    await storeLocal(rel, buf);
+    await renderParts(); await renderFiles();
+    toast(`Saved to GitHub as ${rel} (replaces the previous one).`);
+  } catch (e) {
+    st.innerHTML = `<span class="bad">Could not save to GitHub: ${esc(e.message)}</span>`;
+    btn.disabled = false;
+  }
 }
 
 async function makeParts() {
@@ -491,7 +526,8 @@ async function makeParts() {
       worker.postMessage({ type: "split", files, results, options }, transfer);
     });
     if (m.result.code !== 0 || !m.zip) throw new Error(lines.slice(-6).join("\n") || "The split did not finish.");
-    await idb.put("kv", { name: m.zipName, blob: new Blob([m.zip], { type: "application/zip" }), parts: m.result.parts, when: Date.now() }, "lastParts");
+    await idb.put("kv", { name: m.zipName, blob: new Blob([m.zip], { type: "application/zip" }), parts: m.result.parts, when: Date.now(),
+      source: options.source, mode: options.mode }, "lastParts");
     await renderParts();
     const summary = lines.find((l) => / parts from /.test(l));
     if (summary) st.insertAdjacentHTML("beforeend", `<br><span class="ok">${esc(summary.replace(/ -> .*$/, ""))}</span>`);
@@ -532,7 +568,7 @@ function shareZip(key = "lastZip") {
 
 /* ------------------------------------------------------------------ FILES tab */
 const GROUPS = [["char/", "Character pages (char/)"], ["universes/", "Universes"], ["pre2017/", "Reading lists - pre 2017"],
-  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"]];
+  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"], ["outputs/", "Saved reading parts (outputs/)"]];
 async function renderFiles() {
   const files = await localFiles();
   const q = $("#fileFilter").value.trim().toLowerCase();
@@ -700,6 +736,7 @@ function wire() {
   $("#btnParts").onclick = makeParts;
   $("#btnPartsDownload").onclick = () => downloadZip("lastParts");
   $("#btnPartsShare").onclick = () => shareZip("lastParts");
+  $("#btnPartsGithub").onclick = savePartsToGithub;
   $("#partMode").onchange = () => show("#partSizeWrap", $("#partMode").value === "auto");
   $("#btnPick").onclick = () => $("#upInput").click();
   $("#upInput").onchange = (e) => {
