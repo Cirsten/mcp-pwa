@@ -140,7 +140,17 @@ The columns are `Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume`:
   (data repo v8).
 * Every value is quoted, exactly as the converter writes it.
 
-Making new parts, or a new pipeline run, clears the previous MCRL table.
+**Save to GitHub** (next to *Download MCRL CSV zip*) keeps **one MCRL table of each kind** on GitHub, and saving
+again replaces it:
+
+| Reading order | File in the data repo |
+|---|---|
+| Main order | `outputs/mcrl_import_main.zip` |
+| With alternate universes | `outputs/mcrl_import_universes.zip` |
+
+Older versions stay in the file's *History* on GitHub, and other devices get it under **Files → Saved reading
+parts and MCRL tables**. Making new parts, or a new pipeline run, clears the table on this device; the copy on
+GitHub stays until you save a new one.
 
 **GCD volume column:** the reading-order CSVs have `gcd_volume` next to `title`: the Grand Comics Database volume
 each comic was matched to, written `name (first year)`, e.g. `Avengers (2018)`. The first time after this was added

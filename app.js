@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -532,7 +532,7 @@ async function makeParts() {
   running = true;
   const btn = $("#btnParts"); btn.disabled = true; $("#btnRun").disabled = true;
   const st = $("#partsStatus");
-  st.textContent = "Preparing…"; show("#partsResult", false);
+  st.textContent = "Preparing…"; show("#partsResult", false); $("#partsGithubState").textContent = "";
   try {
     const options = { source: $("#partSource").value, mode: $("#partMode").value, size: Number($("#partSize").value) || 300 };
     const { m, lines } = await runSplit(options, st);
@@ -557,7 +557,7 @@ async function makeMcrl() {
   running = true;
   const btn = $("#btnMcrl"); btn.disabled = true; $("#btnRun").disabled = true; $("#btnParts").disabled = true;
   const st = $("#mcrlStatus");
-  st.textContent = "Preparing…"; show("#mcrlResult", false);
+  st.textContent = "Preparing…"; show("#mcrlResult", false); $("#mcrlGithubState").textContent = "";
   try {
     const options = { source: partsSource(p), mode: partsMode(p), size: p.size || 300, mcrl: true }; // same cuts as the parts
     const { m, lines } = await runSplit(options, st);
@@ -577,13 +577,45 @@ async function renderMcrl() {
   show("#mcrlBox", Boolean(p) && partsSource(p) !== "scenes");
   const q = await idb.get("kv", "lastMcrl");
   show("#mcrlResult", Boolean(q));
-  if (!q) { $("#mcrlStatus").textContent = ""; return; }
+  if (!q) { $("#mcrlStatus").textContent = ""; $("#mcrlGithubState").textContent = ""; return; }
   $("#mcrlStatus").innerHTML = `<b>${esc(q.name)}</b> · ${fmtSize(q.blob.size)} · made ${esc(new Date(q.when).toLocaleString())}` +
     (q.summary ? `<br><span class="ok">${esc(q.summary)}</span>` : "") +
     `<br><span class="muted">Inside: <code>mcrl_import_${esc(q.source)}.csv</code> (every part, one table) and <code>parts/</code> (one CSV per part).</span>`;
   const file = new File([q.blob], q.name, { type: "application/zip" });
   shareFiles.lastMcrl = file;
   show("#btnMcrlShare", canShareFile(file));
+  // GitHub keeps one MCRL table per kind (main / universes); a new save replaces it
+  show("#btnMcrlGithub", configured());
+  const rel = mcrlRepoPath(q.source);
+  const there = await idb.get("files", rel);
+  const same = there && there.sha === (await gitBlobSha(await q.blob.arrayBuffer()));
+  $("#btnMcrlGithub").disabled = Boolean(same);
+  $("#mcrlGithubState").innerHTML = same
+    ? `<span class="ok">Saved on GitHub as <code>${esc(rel)}</code>.</span>`
+    : there ? `<span class="muted">GitHub has an older <code>${esc(rel)}</code>; <b>Save to GitHub</b> replaces it.</span>`
+      : `<span class="muted">Not on GitHub yet. <b>Save to GitHub</b> stores it as <code>${esc(rel)}</code>.</span>`;
+}
+
+const mcrlRepoPath = (source) => `outputs/mcrl_import_${source}.zip`;
+
+async function saveMcrlToGithub() {
+  const btn = $("#btnMcrlGithub"); const st = $("#mcrlGithubState");
+  const q = await idb.get("kv", "lastMcrl");
+  if (!q || !configured()) return;
+  btn.disabled = true;
+  const rel = mcrlRepoPath(q.source);
+  st.textContent = `Saving to GitHub as ${rel}…`;
+  try {
+    const buf = await q.blob.arrayBuffer();
+    await gh().commit([{ path: prefix() + rel, data: buf }],
+      `Save MCRL import table: ${PART_LABELS[q.source]}${q.summary ? " - " + q.summary.replace(/^MCRL import table: /, "") : ""} (from the app)`);
+    await storeLocal(rel, buf);
+    await renderMcrl(); await renderFiles();
+    toast(`Saved to GitHub as ${rel} (replaces the previous one).`);
+  } catch (e) {
+    st.innerHTML = `<span class="bad">Could not save to GitHub: ${esc(e.message)}</span>`;
+    btn.disabled = false;
+  }
 }
 
 async function downloadZip(key = "lastZip") {
@@ -617,7 +649,7 @@ function shareZip(key = "lastZip") {
 
 /* ------------------------------------------------------------------ FILES tab */
 const GROUPS = [["char/", "Character pages (char/)"], ["universes/", "Universes"], ["pre2017/", "Reading lists - pre 2017"],
-  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"], ["outputs/", "Saved reading parts (outputs/)"]];
+  ["post2017/", "Reading lists - 2017 on"], ["cache/", "Saved GCD dates (cache/)"], ["outputs/", "Saved reading parts and MCRL tables (outputs/)"]];
 async function renderFiles() {
   const files = await localFiles();
   const q = $("#fileFilter").value.trim().toLowerCase();
@@ -789,6 +821,7 @@ function wire() {
   $("#btnMcrl").onclick = makeMcrl;
   $("#btnMcrlDownload").onclick = () => downloadZip("lastMcrl");
   $("#btnMcrlShare").onclick = () => shareZip("lastMcrl");
+  $("#btnMcrlGithub").onclick = saveMcrlToGithub;
   $("#partMode").onchange = () => show("#partSizeWrap", $("#partMode").value === "auto");
   $("#btnPick").onclick = () => $("#upInput").click();
   $("#upInput").onchange = (e) => {
