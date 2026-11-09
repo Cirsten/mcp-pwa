@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -389,6 +389,7 @@ async function afterRun(m, secs, hadGcd) {
   $("#runStatus").innerHTML = ok ? `<span class="ok">Finished in ${secs}s.</span>` : `<span class="bad">The pipeline stopped with an error (code ${r.code}) - see the log. The zip still has whatever was produced.</span>`;
 
   const extra = $("#resultExtra"); extra.innerHTML = "";
+  if (r.datesOld) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The <b>gcd_series</b> and <b>gcd_year</b> columns (the matched GCD volume) are empty because the saved dates were made before they existed. Choose gcd.db and run once to fill them; after that every device gets them from the repo.</p>`);
   if (r.datesStale && !hadGcd) extra.insertAdjacentHTML("beforeend", `<p class="warn small">The comic list changed since the GCD dates were made, so some new comics have no cover date. Run again with gcd.db chosen to refresh them.</p>`);
   if (m.cache["dates.csv"] && configured() && (r.datesMade || (await datesNeedUpload()))) {
     // also when the dates were made earlier but never reached the repo (offline, option off, failed save)

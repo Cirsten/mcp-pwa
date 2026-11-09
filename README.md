@@ -118,6 +118,11 @@ the file's *History* on GitHub. On another device, open **Files → Saved readin
 The button turns grey once that exact set is saved. The parts never go into `pre2017/` or `post2017/`, where the
 pipeline would read them back in as your own lists.
 
+**GCD volume columns:** the reading-order CSVs have `gcd_series` and `gcd_year` next to `title`: the Grand Comics
+Database volume each comic was matched to, with its name and first year. The first time after this was added (data
+repo v8), choose `gcd.db` and run once to fill them. Until then the Result card says why they are empty. After
+that, every device gets them from `cache/dates.csv`.
+
 **When do I need gcd.db?** Only when the list of comics changed, meaning new or updated pages. The app warns you
 when the saved dates are older than the comic list. On Windows Chrome/Edge it remembers the file between
 sessions. On Android, pick it each time. To make it smaller first, run `python3 gcd_slim.py /path/to/gcd.db`

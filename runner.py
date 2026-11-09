@@ -138,8 +138,12 @@ def run(opts_json):
     _inputs_unchanged.clear()
     _inputs_unchanged.update(p for p, h in before.items() if after.get(p) == h and p != "dates.csv")
     created = sorted(p for p in after if p not in before and "/" not in p)
+    dates_old = False
+    if after.get("dates.csv"):
+        with open(os.path.join(WORK, "dates.csv"), encoding="utf-8") as f:
+            dates_old = "gcd_series_name" not in f.readline()  # made before the GCD volume columns existed
     return json.dumps({
-        "code": code, "seconds": round(time.time() - t0, 1), "datesMade": bool(dates_made),
+        "code": code, "seconds": round(time.time() - t0, 1), "datesMade": bool(dates_made), "datesOld": dates_old,
         "datesStale": dates_stale, "hasDates": bool(after.get("dates.csv")),
         "changedInputs": changed, "created": created,
     })
