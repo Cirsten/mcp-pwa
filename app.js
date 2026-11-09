@@ -2,7 +2,7 @@
  * Keeps a copy of the GitHub repo in IndexedDB (only changed files are downloaded, checked by git SHA),
  * hands the files to a Web Worker running Python (Pyodide), and returns the CSV results as a zip. */
 "use strict";
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const $ = (s) => document.querySelector(s);
 const MB = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : MB(n));
@@ -381,6 +381,7 @@ async function afterRun(m, secs, hadGcd) {
   const zipBlob = new Blob([m.zip], { type: "application/zip" });
   await idb.put("kv", { name: m.zipName, blob: zipBlob, when: Date.now(), info: m.zipInfo, result: r }, "lastZip");
   await idb.del("kv", "lastParts"); // parts belong to the previous order
+  await idb.del("kv", "lastMcrl");
   // keep this run's dates on the device
   const blobOf = (b) => (b ? new Blob([b]) : null);
   if (m.cache["dates.csv"]) await idb.put("kv", { dates: blobOf(m.cache["dates.csv"]), state: blobOf(m.cache[".pipeline_state.json"]) }, "localCache");
@@ -469,6 +470,7 @@ async function renderParts() {
   const there = await idb.get("files", rel);
   const same = there && there.sha === (await gitBlobSha(await p.blob.arrayBuffer()));
   $("#btnPartsGithub").disabled = Boolean(same);
+  await renderMcrl();
   $("#partsGithubState").innerHTML = same
     ? `<span class="ok">Saved on GitHub as <code>${esc(rel)}</code>.</span>`
     : there ? `<span class="muted">GitHub has an older <code>${esc(rel)}</code>; <b>Save to GitHub</b> replaces it.</span>`
@@ -496,39 +498,47 @@ async function savePartsToGithub() {
   }
 }
 
+/** Run split_reading_order.py in the worker on the last run's results. -> { m, lines } */
+async function runSplit(options, st) {
+  const z = await idb.get("kv", "lastZip");
+  if (!z) throw new Error("Run the pipeline first.");
+  const stored = await localFiles();
+  const files = {}, transfer = [];
+  for (const f of stored) {
+    if (f.path.startsWith("cache/") || !(f.path.endsWith(".py") || /^(pre2017|post2017)\//.test(f.path) || f.path.endsWith(".csv"))) continue;
+    const buf = await f.blob.arrayBuffer(); files[f.path] = buf; transfer.push(buf);
+  }
+  const results = await z.blob.arrayBuffer(); transfer.push(results);
+  await startWorker();
+  const lines = [];
+  const m = await new Promise((res, rej) => {
+    const h = (e) => {
+      const d = e.data;
+      if (d.type === "log") { lines.push(d.line); st.textContent = d.line; }
+      else if (d.type === "status") st.textContent = d.text;
+      else if (d.type === "splitDone") { worker.removeEventListener("message", h); res(d); }
+      else if (d.type === "error") { worker.removeEventListener("message", h); rej(new Error(d.message)); }
+    };
+    worker.addEventListener("message", h);
+    runPipeline._reject = rej;
+    worker.postMessage({ type: "split", files, results, options }, transfer);
+  });
+  if (m.result.code !== 0 || !m.zip) throw new Error(lines.slice(-6).join("\n") || "The split did not finish.");
+  return { m, lines };
+}
+
 async function makeParts() {
   if (running) return;
   running = true;
   const btn = $("#btnParts"); btn.disabled = true; $("#btnRun").disabled = true;
-  const st = $("#partsStatus"); const lines = [];
+  const st = $("#partsStatus");
   st.textContent = "Preparing…"; show("#partsResult", false);
   try {
-    const z = await idb.get("kv", "lastZip");
-    if (!z) throw new Error("Run the pipeline first.");
-    const stored = await localFiles();
-    const files = {}, transfer = [];
-    for (const f of stored) {
-      if (f.path.startsWith("cache/") || !(f.path.endsWith(".py") || /^(pre2017|post2017)\//.test(f.path) || f.path.endsWith(".csv"))) continue;
-      const buf = await f.blob.arrayBuffer(); files[f.path] = buf; transfer.push(buf);
-    }
-    const results = await z.blob.arrayBuffer(); transfer.push(results);
     const options = { source: $("#partSource").value, mode: $("#partMode").value, size: Number($("#partSize").value) || 300 };
-    await startWorker();
-    const m = await new Promise((res, rej) => {
-      const h = (e) => {
-        const d = e.data;
-        if (d.type === "log") { lines.push(d.line); st.textContent = d.line; }
-        else if (d.type === "status") st.textContent = d.text;
-        else if (d.type === "splitDone") { worker.removeEventListener("message", h); res(d); }
-        else if (d.type === "error") { worker.removeEventListener("message", h); rej(new Error(d.message)); }
-      };
-      worker.addEventListener("message", h);
-      runPipeline._reject = rej;
-      worker.postMessage({ type: "split", files, results, options }, transfer);
-    });
-    if (m.result.code !== 0 || !m.zip) throw new Error(lines.slice(-6).join("\n") || "The split did not finish.");
+    const { m, lines } = await runSplit(options, st);
     await idb.put("kv", { name: m.zipName, blob: new Blob([m.zip], { type: "application/zip" }), parts: m.result.parts, when: Date.now(),
-      source: options.source, mode: options.mode }, "lastParts");
+      source: options.source, mode: options.mode, size: options.size }, "lastParts");
+    await idb.del("kv", "lastMcrl"); // an MCRL table belongs to the previous parts
     await renderParts();
     const summary = lines.find((l) => / parts from /.test(l));
     if (summary) st.insertAdjacentHTML("beforeend", `<br><span class="ok">${esc(summary.replace(/ -> .*$/, ""))}</span>`);
@@ -538,6 +548,44 @@ async function makeParts() {
     running = false; btn.disabled = false; $("#btnRun").disabled = false; runPipeline._reject = null;
   }
 }
+
+/* MCRL import table: the parts just made, in the Smart CSV Converter's SPC layout (not for scenes) */
+async function makeMcrl() {
+  if (running) return;
+  const p = await idb.get("kv", "lastParts");
+  if (!p || partsSource(p) === "scenes") return;
+  running = true;
+  const btn = $("#btnMcrl"); btn.disabled = true; $("#btnRun").disabled = true; $("#btnParts").disabled = true;
+  const st = $("#mcrlStatus");
+  st.textContent = "Preparing…"; show("#mcrlResult", false);
+  try {
+    const options = { source: partsSource(p), mode: partsMode(p), size: p.size || 300, mcrl: true }; // same cuts as the parts
+    const { m, lines } = await runSplit(options, st);
+    const summary = (lines.find((l) => /MCRL import table:/.test(l)) || "").replace(/ -> .*$/, "");
+    await idb.put("kv", { name: m.zipName, blob: new Blob([m.zip], { type: "application/zip" }), when: Date.now(),
+      source: options.source, summary }, "lastMcrl");
+    await renderMcrl();
+  } catch (e) {
+    st.innerHTML = `<span class="bad">${esc(e.message).replace(/\n/g, "<br>")}</span>`;
+  } finally {
+    running = false; btn.disabled = false; $("#btnRun").disabled = false; $("#btnParts").disabled = false; runPipeline._reject = null;
+  }
+}
+
+async function renderMcrl() {
+  const p = await idb.get("kv", "lastParts");
+  show("#mcrlBox", Boolean(p) && partsSource(p) !== "scenes");
+  const q = await idb.get("kv", "lastMcrl");
+  show("#mcrlResult", Boolean(q));
+  if (!q) { $("#mcrlStatus").textContent = ""; return; }
+  $("#mcrlStatus").innerHTML = `<b>${esc(q.name)}</b> · ${fmtSize(q.blob.size)} · made ${esc(new Date(q.when).toLocaleString())}` +
+    (q.summary ? `<br><span class="ok">${esc(q.summary)}</span>` : "") +
+    `<br><span class="muted">Inside: <code>mcrl_import_${esc(q.source)}.csv</code> (every part, one table) and <code>parts/</code> (one CSV per part).</span>`;
+  const file = new File([q.blob], q.name, { type: "application/zip" });
+  shareFiles.lastMcrl = file;
+  show("#btnMcrlShare", canShareFile(file));
+}
+
 async function downloadZip(key = "lastZip") {
   const z = await idb.get("kv", key); if (!z) return;
   const url = URL.createObjectURL(z.blob);
@@ -738,6 +786,9 @@ function wire() {
   $("#btnPartsDownload").onclick = () => downloadZip("lastParts");
   $("#btnPartsShare").onclick = () => shareZip("lastParts");
   $("#btnPartsGithub").onclick = savePartsToGithub;
+  $("#btnMcrl").onclick = makeMcrl;
+  $("#btnMcrlDownload").onclick = () => downloadZip("lastMcrl");
+  $("#btnMcrlShare").onclick = () => shareZip("lastMcrl");
   $("#partMode").onchange = () => show("#partSizeWrap", $("#partMode").value === "auto");
   $("#btnPick").onclick = () => $("#upInput").click();
   $("#upInput").onchange = (e) => {

@@ -58,7 +58,7 @@ async function split({ files, results, options }) {
   py.FS.writeFile("/tmp/last_results.zip", new Uint8Array(results));
   post("status", { text: "Cutting the reading order into parts…" });
   const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "");
-  const zipName = `reading_parts_${options.source}_${options.mode}_${stamp}.zip`;
+  const zipName = `${options.mcrl ? "mcrl_import" : "reading_parts"}_${options.source}_${options.mode}_${stamp}.zip`;
   const result = JSON.parse(py.globals.get("pwa_runner").split(JSON.stringify({ ...options, zipName })));
   let zip = null;
   if (result.code === 0 && py.FS.analyzePath("/tmp/" + zipName).exists) {

@@ -83,9 +83,7 @@
   <div class="card hidden" id="partsCard">
     <h2>Split into reading parts</h2>
     <p class="muted small">Cuts the finished reading order into numbered Excel lists laid out like your own
-      (column A, one comic per row), e.g. <i>01 1961-1963 Birth of the Fantastic Four to Birth of the Avengers</i>.
-      The zip also has the same parts as Smart CSV Converter "SPC" files in <code>spc/</code>
-      (<i>Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume</i>), one per part plus one for all parts.</p>
+      (column A, one comic per row), e.g. <i>01 1961-1963 Birth of the Fantastic Four to Birth of the Avengers</i>.</p>
     <div class="row2">
       <label class="field">Reading order
         <select id="partSource">
@@ -115,6 +113,22 @@
         <button id="btnPartsGithub">Save to GitHub</button>
       </div>
       <p id="partsGithubState" class="small"></p>
+      <div id="mcrlBox" class="subbox hidden">
+        <h3>MCRL import table</h3>
+        <p class="muted small">These same parts as one CSV table to import into MCRL, prepared the way the Smart CSV
+          Converter prepares an SPC list: no flashbacks, primary stories only, each issue once per part, no commas.
+          Columns <i>Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume</i>. SPC ERO restarts at 1 in
+          every part and SPC RO runs through them all. Not offered for <i>scenes</i>, because those rules would undo
+          the scene detail.</p>
+        <div class="row">
+          <button id="btnMcrl">Make MCRL import CSV</button>
+        </div>
+        <p id="mcrlStatus" class="small"></p>
+        <div id="mcrlResult" class="row hidden">
+          <button id="btnMcrlDownload" class="primary">Download MCRL CSV zip</button>
+          <button id="btnMcrlShare" class="hidden">Share…</button>
+        </div>
+      </div>
       <ul id="partsList" class="changes"></ul>
     </div>
   </div>

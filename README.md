@@ -104,18 +104,6 @@ Avengers.xlsx`. You choose:
 
 It runs `split_reading_order.py` from the data repo, so the repo needs pipeline v7 or later.
 
-The zip also holds the parts as **Smart CSV Converter "SPC" CSVs** in `spc/`: one per part, named like the
-converter names them (e.g. `01_1961_1963_birth_of_the_fantastic_four_to_birth_of_the_avengers.csv`), plus
-`all_parts_<kind>.csv` with every part in one file. The columns are
-`Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume`:
-* **SPC ERO** restarts at 1 for every part. **SPC RO** runs from 1 through all parts, so part 02 carries on
-  where part 01 stopped.
-* **published** is the GCD cover date as `mm/dd/yyyy`. GCD often gives only the month, and then the day is 01.
-* **GCD volume** is the matched GCD volume, `name (first year)`.
-* Both of those are empty for comics without a GCD match, and until you run once with gcd.db (data repo v8).
-* **SPC Event** is the part's name. Every value is quoted, exactly as the converter writes it.
-* In the "scenes" kind, a comic cited several times in a row (different page ranges) is listed once.
-
 **Save to GitHub** (next to *Download parts zip*) puts the parts on GitHub so every device has them. GitHub keeps
 **one file of each kind**, and saving a new set replaces it:
 
@@ -129,6 +117,30 @@ Whether the set was cut at your lists or automatically is in the commit message,
 the file's *History* on GitHub. On another device, open **Files → Saved reading parts → Save** to download one.
 The button turns grey once that exact set is saved. The parts never go into `pre2017/` or `post2017/`, where the
 pipeline would read them back in as your own lists.
+
+**MCRL import table** is an extra step under the parts, for *Main order* and *With alternate universes*.
+It is not offered for *scenes*, because its rules would undo the scene detail. **Make MCRL import CSV** turns
+the parts you just made (same cuts and names) into a table in the Smart CSV Converter's "SPC" layout, ready to
+import into MCRL. **Download MCRL CSV zip** (or **Share…** on Android) gives `mcrl_import_<kind>_<cut>_<date>.zip`
+with:
+* `mcrl_import_<kind>.csv`: every part in one table.
+* `parts/<one CSV per part>`: named like the converter names them, e.g.
+  `01_1961_1963_birth_of_the_fantastic_four_to_birth_of_the_avengers.csv`.
+
+The columns are `Volume, #, SPC ERO, SPC RO, published, SPC Event, GCD volume`:
+* The rows are prepared the way the converter's transformation workflow does it:
+  * **2 no flashbacks:** flashback-only comics are left out.
+  * **3 primary only:** back-up stories such as `TOS 52/3` are left out.
+  * **7 unique issues:** each Volume + # appears once per part, and the first one is kept.
+  * **9 format volumes:** every comma is removed.
+  * Steps 1, 4, 5 and 6 are already true of the reading order. *Find dates* is not used, so **published** is empty.
+* **SPC ERO** restarts at 1 for every part. **SPC RO** runs from 1 through all parts.
+* **SPC Event** is the part's name.
+* **GCD volume** is the matched GCD volume, `name (first year)`. It is empty until you run once with gcd.db
+  (data repo v8).
+* Every value is quoted, exactly as the converter writes it.
+
+Making new parts, or a new pipeline run, clears the previous MCRL table.
 
 **GCD volume column:** the reading-order CSVs have `gcd_volume` next to `title`: the Grand Comics Database volume
 each comic was matched to, written `name (first year)`, e.g. `Avengers (2018)`. The first time after this was added

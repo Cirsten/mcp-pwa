@@ -175,11 +175,11 @@ def split(opts_json):
                 z.extract(name, WORK)
     out = "/tmp/" + opts["zipName"]
     argv = ["split_reading_order.py", "--source", opts.get("source", "main"), "--mode", opts.get("mode", "lists"),
-            "--size", str(int(opts.get("size") or 300)), "--out", out]
+            "--size", str(int(opts.get("size") or 300))] + (["--mcrl"] if opts.get("mcrl") else []) + ["--out", out]
     print("$ python3 " + " ".join(argv[:-2]))
     code = _run_script(argv, WORK).returncode
     names = []
     if code == 0 and os.path.exists(out):
         with zipfile.ZipFile(out) as z:
-            names = [n for n in z.namelist() if n.endswith(".xlsx")]
+            names = [n for n in z.namelist() if n.endswith(".csv" if opts.get("mcrl") else ".xlsx")]
     return json.dumps({"code": code, "parts": names})
